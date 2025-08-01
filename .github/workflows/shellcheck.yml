@@ -2,7 +2,15 @@ name: Shellcheck Validation
 
 on:
   issue_comment:
-    types: [created]
+    types: [created, edited]
+  # optional – lets you run it from the “Actions” tab while debugging
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  statuses: write
 
 jobs:
   shellcheck:
