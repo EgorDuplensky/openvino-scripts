@@ -49,7 +49,7 @@ ONOFF_FLAGS = [
     "profiling-itt", "coverage", "fuzzing",
     # Build toggles
     "lto", "faster-build", "intergritycheck", "qspectre"
-    
+
 ]
 
 FRONTENDS = ["onnx", "paddle", "tf", "tf_lite", "pytorch", "ir", "jax"]
@@ -100,7 +100,7 @@ def _build_parser() -> argparse.ArgumentParser:
             choices=["on","off"],
             help=f"Enable {flag.replace('-', ' ')} (on / off)"
         )
-    
+
     # Another way to enable plugins
     p.add_argument(
         "--enable-plugins", nargs='+', choices=PLUGINS,
@@ -285,7 +285,7 @@ def add_arg(cmd: list[str], flag: str, value):
     if not value:
         # No value to add, skip
         return
-    
+
     if value is True:
         # boolean flag, no value
         cmd.append(flag)
@@ -297,9 +297,16 @@ def add_arg(cmd: list[str], flag: str, value):
         # flag followed by a single value
         cmd.extend([flag, str(value)])
 
-def run() -> None:
-    parser = _build_parser()
-    # Phase 1: only import
+def import_if_provided(parser: argparse.ArgumentParser) -> tuple[argparse.Namespace, dict]:
+    """Handle configuration import and return parsed arguments with defaults.
+
+    Performs two-phase parsing:
+    1. Extract --import flag to load config file defaults
+    2. Parse all arguments with loaded defaults applied
+
+    Returns:
+        Tuple of (parsed arguments namespace, defaults dict from import file)
+    """
     import_parser = argparse.ArgumentParser(add_help=False)
     import_parser.add_argument("--import", dest="import_file", nargs='?', const=".build", metavar="FILE")
     known_args, remaining_argv = import_parser.parse_known_args()
@@ -320,40 +327,55 @@ def run() -> None:
             else:
                 print(f"Warning: Unknown option '{k}' in import file; ignoring", file=sys.stderr)
     parser.set_defaults(**defaults)
-    # Phase 2: full parse
     args = parser.parse_args(remaining_argv)
-    # Restore import_file from phase1
-    args.import_file = known_args.import_file
 
+    #argparse REMAINDER resets to [] even with defaults, so restore imported target
+    if 'target' in defaults and not args.target:
+        args.target = defaults['target']
+
+    # Restore import_file
+    args.import_file = known_args.import_file
+    return args, defaults
+
+def export_args(parser: argparse.ArgumentParser, args: argparse.Namespace, defaults: dict) -> None:
+    """Export configuration parameters to YAML file and exit.
+
+    Args:
+        parser: The argument parser to determine which options were provided
+        args: Parsed arguments namespace
+        defaults: Dictionary of defaults loaded from import file
+    """
+    # Determine which parameters were explicitly provided via import or CLI
+    provided = set(defaults.keys())
+    # CLI-provided flags
+    for action in parser._actions:
+        for opt in action.option_strings:
+            if opt in sys.argv:
+                provided.add(action.dest)
+
+    to_export: dict = {}
+    for name, value in vars(args).items():
+        if name in ("export_file", "import_file"):
+            continue
+        if name not in provided:
+            continue
+        to_export[name] = value
+    try:
+        with open(args.export_file, 'w') as f:
+            yaml.safe_dump(to_export, f)
+        print(f"Exported parameters to {args.export_file}")
+    except Exception as e:
+        print(f"Error: Unable to export to file {args.export_file}: {e}", file=sys.stderr)
+        sys.exit(1)
+
+def run() -> None:
+    parser = _build_parser()
+    args, defaults = import_if_provided(parser)
 
     # Handle export
     if args.export_file:
-        # Determine which parameters were explicitly provided via import or CLI
-        provided = set(defaults.keys())
-        # CLI-provided flags
-        for action in parser._actions:
-            for opt in action.option_strings:
-                if opt in sys.argv:
-                    provided.add(action.dest)
-        # Positional targets
-        if args.target:
-            provided.add('target')
-
-        to_export: dict = {}
-        for name, value in vars(args).items():
-            if name in ("export_file", "import_file"):
-                continue
-            if name not in provided:
-                continue
-            to_export[name] = value
-        try:
-            with open(args.export_file, 'w') as f:
-                yaml.safe_dump(to_export, f)
-            print(f"Exported parameters to {args.export_file}")
-        except Exception as e:
-            print(f"Error: Unable to export to file {args.export_file}: {e}", file=sys.stderr)
-            sys.exit(1)
-        return    # Handle export
+        export_args(parser, args, defaults)
+        return
 
     # Shell completion provisioning
     if args.completion:
@@ -385,7 +407,7 @@ def run() -> None:
     _initial_env(args)
     if args.quiet:
        args.verbose = 0
-    
+
     cmake_cmd = [
         cmake_path,
         *generator,
@@ -394,7 +416,7 @@ def run() -> None:
         str(ROOT),
         '-B', str(build_dir)
     ]
-    
+
 
     if args.verbose > 2:
         print('CMake command:', ' '.join(cmake_cmd))
