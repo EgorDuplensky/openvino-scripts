@@ -402,10 +402,13 @@ def run() -> None:
         # print(f"Building with {num_jobs} jobs...")
 
     # Configure step
-    if args.configure and args.configure > 0:
+    should_configure = (args.configure and args.configure > 0) or args.configure_only
+    if should_configure:
         subprocess.run(cmake_cmd, check=True)
-        if args.configure > 1:
+        # Exit after configure if -cc or --configure-only
+        if (args.configure and args.configure > 1) or args.configure_only:
             return
+    
     # Build step
     build_cmd = [cmake_path,'--build', str(build_dir)]
 
