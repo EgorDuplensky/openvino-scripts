@@ -6,15 +6,8 @@ on:
   # optional – lets you run it from the “Actions” tab while debugging
   workflow_dispatch:
 
-permissions:
-  contents: read
-  issues: write
-  pull-requests: write
-  statuses: write
-
 jobs:
   shellcheck:
-    if: github.event.issue.pull_request && contains(github.event.comment.body, '/run-shellcheck')
     runs-on: ubuntu-latest
     
     steps:
