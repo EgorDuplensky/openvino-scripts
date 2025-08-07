@@ -87,7 +87,6 @@ def _build_parser() -> argparse.ArgumentParser:
                        "-c :  Run CMake configure step\n"
                        "-cc : Run CMake configure step and exit (do not build)\n"
                    ))
-    p.add_argument("-x", "--configure-only", action="store_true", help="Stop after CMake configure step")
     # Build type
     p.add_argument("-b", "--build-type", metavar="TYPE", default="Release",
                    choices=["Release", "Debug", "RelWithDebInfo"], help="CMAKE_BUILD_TYPE")
@@ -402,11 +401,10 @@ def run() -> None:
         # print(f"Building with {num_jobs} jobs...")
 
     # Configure step
-    should_configure = (args.configure and args.configure > 0) or args.configure_only
-    if should_configure:
+    if args.configure and args.configure > 0:
         subprocess.run(cmake_cmd, check=True)
         # Exit after configure if -cc or --configure-only
-        if (args.configure and args.configure > 1) or args.configure_only:
+        if (args.configure and args.configure > 1):
             return
     
     # Build step
