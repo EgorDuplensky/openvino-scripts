@@ -15,15 +15,17 @@ Example:
 """
 
 from __future__ import annotations
-import shutil
-import argcomplete
+
 import argparse
 import os
+import shutil
 import subprocess
 import sys
 from multiprocessing import cpu_count
 from pathlib import Path
 from typing import List
+
+import argcomplete
 # External package, json is too verbose
 import yaml
 
