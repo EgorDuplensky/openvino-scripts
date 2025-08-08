@@ -149,6 +149,8 @@ def _build_parser() -> argparse.ArgumentParser:
                    help="Export current parameters to a YAML file and exit")
     p.add_argument("--import", dest="import_file", nargs='?', const=".build", metavar="FILE",
                    help="Import parameters from a YAML file (default '.build')")
+    p.add_argument("--ignore-config", action="store_true",
+                   help="Ignore the default .build configuration file")
 
     p.add_argument("target", nargs=argparse.REMAINDER,
                    help="Targets passed verbatim to 'cmake --build'")
@@ -296,35 +298,67 @@ def add_arg(cmd: list[str], flag: str, value):
         # flag followed by a single value
         cmd.extend([flag, str(value)])
 
+def _load_config_file(file_path: str, parser: argparse.ArgumentParser, is_error_fatal: bool = True) -> dict:
+    """Load and validate configuration from a YAML file.
+
+    Args:
+        file_path: Path to the configuration file
+        parser: Argument parser to validate against
+        is_error_fatal: If True, exit on file errors; if False, print warning and continue
+
+    Returns:
+        Dictionary of valid configuration options
+    """
+    try:
+        with open(file_path) as f:
+            loaded = yaml.safe_load(f) or {}
+    except Exception as e:
+        if is_error_fatal:
+            print(f"Error: Unable to load import file {file_path}: {e}", file=sys.stderr)
+            sys.exit(1)
+        else:
+            print(f"Warning: Unable to load {file_path} file: {e}", file=sys.stderr)
+            return {}
+
+    # Filter only valid options
+    valid_dests = {action.dest for action in parser._actions}
+    valid_config = {}
+    for k, v in loaded.items():
+        if k in valid_dests:
+            valid_config[k] = v
+        else:
+            file_type = "import" if is_error_fatal else Path(file_path).name
+            print(f"Warning: Unknown option '{k}' in {file_type} file; ignoring", file=sys.stderr)
+
+    return valid_config
+
 def import_if_provided(parser: argparse.ArgumentParser) -> tuple[argparse.Namespace, dict]:
     """Handle configuration import and return parsed arguments with defaults.
 
     Performs two-phase parsing:
-    1. Extract --import flag to load config file defaults
-    2. Parse all arguments with loaded defaults applied
+    1. Extract --import and --ignore-config flags
+    2. Load .build by default unless --ignore-config is specified
+    3. Load --import file if specified (overrides .build defaults)
+    4. Parse all arguments with loaded defaults applied
 
     Returns:
         Tuple of (parsed arguments namespace, defaults dict from import file)
     """
     import_parser = argparse.ArgumentParser(add_help=False)
     import_parser.add_argument("--import", dest="import_file", nargs='?', const=".build", metavar="FILE")
+    import_parser.add_argument("--ignore-config", action="store_true")
     known_args, remaining_argv = import_parser.parse_known_args()
 
     defaults: dict = {}
+
+    # Load .build file by default unless --ignore-config is specified
+    if not known_args.ignore_config and Path(".build").exists():
+        defaults.update(_load_config_file(".build", parser, is_error_fatal=False))
+
+    # Load --import file if specified (overrides .build defaults)
     if known_args.import_file:
-        try:
-            with open(known_args.import_file) as f:
-                loaded = yaml.safe_load(f) or {}
-        except Exception as e:
-            print(f"Error: Unable to load import file {known_args.import_file}: {e}", file=sys.stderr)
-            sys.exit(1)
-        # Filter only valid options
-        valid_dests = {action.dest for action in parser._actions}
-        for k, v in loaded.items():
-            if k in valid_dests:
-                defaults[k] = v
-            else:
-                print(f"Warning: Unknown option '{k}' in import file; ignoring", file=sys.stderr)
+        defaults.update(_load_config_file(known_args.import_file, parser, is_error_fatal=True))  # @todo This overwrites .build values as intended
+
     parser.set_defaults(**defaults)
     args = parser.parse_args(remaining_argv)
 
@@ -332,8 +366,9 @@ def import_if_provided(parser: argparse.ArgumentParser) -> tuple[argparse.Namesp
     if 'target' in defaults and not args.target:
         args.target = defaults['target']
 
-    # Restore import_file
+    # Restore import_file and ignore_config flags
     args.import_file = known_args.import_file
+    args.ignore_config = known_args.ignore_config
     return args, defaults
 
 def export_args(parser: argparse.ArgumentParser, args: argparse.Namespace, defaults: dict) -> None:
@@ -428,7 +463,7 @@ def run() -> None:
         # Exit after configure if -cc or --configure-only
         if (args.configure and args.configure > 1):
             return
-    
+
     # Build step
     build_cmd = [cmake_path,'--build', str(build_dir)]
 
