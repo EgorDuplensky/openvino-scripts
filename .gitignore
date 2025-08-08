@@ -1,0 +1,9 @@
+# Python
+*.pyc
+
+# IDE
+.vscode/
+.idea/
+
+# System
+.DS_Store
