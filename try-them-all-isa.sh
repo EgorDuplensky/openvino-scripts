@@ -15,7 +15,7 @@ AVX2_VNNI_2
 AVX512_CORE_AMX_FP16"
 
 for isa in $isa_list; do
-    printf "### Running with '%s' ISA... " $isa
+    printf "### Running with '%s' ISA... " "$isa"
     if ONEDNN_MAX_CPU_ISA=$isa $command_to_execute; then
         printf "OK!\n"
     else
