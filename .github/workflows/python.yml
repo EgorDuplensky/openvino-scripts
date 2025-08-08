@@ -99,7 +99,7 @@ jobs:
         if [[ "$isort_ran" != "skipped" && "$isort_status" != "success" ]]; then
           success=false
         fi
-        if [[ "$flake8_ran" == "success" && "$flake8_status" != "success" ]]; then
+        if [[ "$flake8_ran" != "skipped" && "$flake8_status" != "success" ]]; then
           success=false
         fi
         
