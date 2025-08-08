@@ -42,14 +42,14 @@ ONOFF_FLAGS = [
     "system-pugixml", "system-snappy", "system-opencl", "system-tbb", "system-protobuf", "system-flatbuffers", "tbbbind-2-5",
     # Binary size optimizations
     "sse42", "avx2", "avx512f",
-    # Profiling
     # Extra third party
     "mlas-for-cpu", "kleidiai-for-cpu",
     # Test instrumentation and profiling
     "profiling-itt", "coverage", "fuzzing",
     # Build toggles
-    "lto", "faster-build", "intergritycheck", "qspectre"
-
+    "lto", "faster-build", "intergritycheck", "qspectre",
+    # Extra
+    "cpu-specific-target-per-test"
 ]
 
 FRONTENDS = ["onnx", "paddle", "tf", "tf_lite", "pytorch", "ir", "jax"]
