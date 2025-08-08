@@ -39,7 +39,8 @@ ONOFF_FLAGS = [
     # Extra features,
     "python", "wheel", "samples", "tests", "docs",
     # System provided dependencies
-    "system-pugixml", "system-snappy", "system-opencl", "system-tbb", "system-protobuf", "system-flatbuffers", "tbbbind-2-5",
+    "system-pugixml", "system-snappy", "system-opencl", "system-tbb",
+    "system-protobuf", "system-flatbuffers", "tbbbind-2-5",
     # Binary size optimizations
     "sse42", "avx2", "avx512f",
     # Extra third party
@@ -60,6 +61,7 @@ PLUGINS = [
 
 ROOT = Path.cwd()
 
+
 def find_repo_root() -> Path:
     """Locate the repository root by searching for CMakeLists.txt upwards from cwd."""
     p = Path.cwd()
@@ -71,9 +73,11 @@ def find_repo_root() -> Path:
             sys.exit(1)
         p = p.parent
 
+
 def _nprocs_minus_two() -> int:
     """Return at least 1 and at most (nproc–2)."""
     return max(1, cpu_count() - 2)
+
 
 def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
@@ -90,13 +94,14 @@ def _build_parser() -> argparse.ArgumentParser:
     # Build type
     p.add_argument("-b", "--build-type", metavar="TYPE", default="Release",
                    choices=["Release", "Debug", "RelWithDebInfo"], help="CMAKE_BUILD_TYPE")
-    p.add_argument('-j', '--parallel', type=int, default=0, help='The maximum number of concurrent processes to use when building')
+    p.add_argument('-j', '--parallel', type=int, default=0,
+                   help='The maximum number of concurrent processes to use when building')
 
     # Feature toggles (on / off)
     for flag in ONOFF_FLAGS:
         p.add_argument(
             f"--enable-{flag}",
-            choices=["on","off"],
+            choices=["on", "off"],
             help=f"Enable {flag.replace('-', ' ')} (on / off)"
         )
 
@@ -115,7 +120,8 @@ def _build_parser() -> argparse.ArgumentParser:
     )
 
     # Conditional compilation
-    p.add_argument("--enable-cc", choices=["collect", "apply"], help="Selective build config, 'collect' or 'apply' statistics")
+    p.add_argument("--enable-cc", choices=["collect", "apply"],
+                   help="Selective build config, 'collect' or 'apply' statistics")
     p.add_argument("--cc-stat-file", metavar="CSV", help="Stats CSV for --enable-cc apply stage")
 
     # Threading
@@ -129,7 +135,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--output-root", metavar="PATH", dest="output_root",
                    help="Path for OUTPUT_ROOT CMake variable (defaults to source directory)")
 
-    ### Extra options
+    # Extra options
     # Ccache
     p.add_argument("--use-ccache", dest="use_ccache", action="store_true", default=True, help="Enable ccache")
     # Architecture
@@ -161,6 +167,7 @@ def _build_parser() -> argparse.ArgumentParser:
     # Installation to generate completions at runtime is handled via --completion flag
 
     return p
+
 
 def _initial_env(args) -> None:
     if args.use_ccache:
@@ -196,8 +203,8 @@ def _compute_build_dir(args) -> str:
         suffix += "_ov_debug"
     return f"build_{args.build_type}{suffix}"
 
+
 def _collect_cmake_defs(args) -> dict[str, str]:
-    build_dir = _compute_build_dir(args)
     defs: dict[str, str] = {
         "CMAKE_BUILD_TYPE": args.build_type,
         "ENABLE_CPP_API": "ON",
@@ -281,6 +288,7 @@ def _collect_cmake_defs(args) -> dict[str, str]:
 def _cmake_options(args) -> List[str]:
     return [f"-D{k}={v}" for k, v in _collect_cmake_defs(args).items()]
 
+
 def add_arg(cmd: list[str], flag: str, value):
     """
     - If value is truthy and not a list/tuple → append flag + single value
@@ -302,6 +310,7 @@ def add_arg(cmd: list[str], flag: str, value):
     elif value is not None:
         # flag followed by a single value
         cmd.extend([flag, str(value)])
+
 
 def _load_config_file(file_path: str, parser: argparse.ArgumentParser, is_error_fatal: bool = True) -> dict:
     """Load and validate configuration from a YAML file.
@@ -337,6 +346,7 @@ def _load_config_file(file_path: str, parser: argparse.ArgumentParser, is_error_
 
     return valid_config
 
+
 def import_if_provided(parser: argparse.ArgumentParser) -> tuple[argparse.Namespace, dict]:
     """Handle configuration import and return parsed arguments with defaults.
 
@@ -362,12 +372,13 @@ def import_if_provided(parser: argparse.ArgumentParser) -> tuple[argparse.Namesp
 
     # Load --import file if specified (overrides .build defaults)
     if known_args.import_file:
-        defaults.update(_load_config_file(known_args.import_file, parser, is_error_fatal=True))  # @todo This overwrites .build values as intended
+        defaults.update(_load_config_file(known_args.import_file, parser,
+                                          is_error_fatal=True))
 
     parser.set_defaults(**defaults)
     args = parser.parse_args(remaining_argv)
 
-    #argparse REMAINDER resets to [] even with defaults, so restore imported target
+    # argparse REMAINDER resets to [] even with defaults, so restore imported target
     if 'target' in defaults and not args.target:
         args.target = defaults['target']
 
@@ -375,6 +386,7 @@ def import_if_provided(parser: argparse.ArgumentParser) -> tuple[argparse.Namesp
     args.import_file = known_args.import_file
     args.ignore_config = known_args.ignore_config
     return args, defaults
+
 
 def export_args(parser: argparse.ArgumentParser, args: argparse.Namespace, defaults: dict) -> None:
     """Export configuration parameters to YAML file and exit.
@@ -406,6 +418,7 @@ def export_args(parser: argparse.ArgumentParser, args: argparse.Namespace, defau
     except Exception as e:
         print(f"Error: Unable to export to file {args.export_file}: {e}", file=sys.stderr)
         sys.exit(1)
+
 
 def run() -> None:
     parser = _build_parser()
@@ -445,17 +458,16 @@ def run() -> None:
     build_dir.mkdir(parents=True, exist_ok=True)
     _initial_env(args)
     if args.quiet:
-       args.verbose = 0
+        args.verbose = 0
 
     cmake_cmd = [
         cmake_path,
         *generator,
         f"--log-level={'DEBUG' if args.verbose else 'ERROR'}",
-        * _cmake_options(args),
+        *_cmake_options(args),
         str(ROOT),
         '-B', str(build_dir)
     ]
-
 
     if args.verbose > 2:
         print('CMake command:', ' '.join(cmake_cmd))
@@ -470,7 +482,7 @@ def run() -> None:
             return
 
     # Build step
-    build_cmd = [cmake_path,'--build', str(build_dir)]
+    build_cmd = [cmake_path, '--build', str(build_dir)]
 
     # 2) Single-value argument:
     add_arg(build_cmd, '--parallel', args.parallel)
@@ -479,6 +491,7 @@ def run() -> None:
     add_arg(build_cmd, '--target', args.target)
 
     subprocess.run(build_cmd, check=True)
+
 
 if __name__ == '__main__':
     try:
