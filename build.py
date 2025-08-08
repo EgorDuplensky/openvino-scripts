@@ -246,7 +246,7 @@ def _collect_cmake_defs(args) -> dict[str, str]:
         if getattr(args, f"enable_{pl}_plugin", False):
             pl_list.add(pl)
     for pl in PLUGINS:
-        defs[f"ENABLE_{pl.upper()}_PLUGIN"] = "ON" if pl in pl_list else "OFF"
+        defs[f"ENABLE_{pl.upper()}"] = "ON" if pl in pl_list else "OFF"
     # Conditional compilation
     if args.enable_cc == 'collect':
         defs['SELECTIVE_BUILD'] = 'COLLECT'
