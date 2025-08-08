@@ -126,6 +126,8 @@ def _build_parser() -> argparse.ArgumentParser:
     # External libs
     p.add_argument("--opencv-dir", metavar="PATH", dest="opencv_dir",
                    help="Path to OpenCV installation (sets OpenCV_DIR)")
+    p.add_argument("--output-root", metavar="PATH", dest="output_root",
+                   help="Path for OUTPUT_ROOT CMake variable (defaults to source directory)")
 
     ### Extra options
     # Ccache
@@ -195,11 +197,14 @@ def _compute_build_dir(args) -> str:
     return f"build_{args.build_type}{suffix}"
 
 def _collect_cmake_defs(args) -> dict[str, str]:
+    build_dir = _compute_build_dir(args)
     defs: dict[str, str] = {
         "CMAKE_BUILD_TYPE": args.build_type,
         "ENABLE_CPP_API": "ON",
         # Always enable GAPI preprocessing as in original script
         "ENABLE_GAPI_PREPROCESSING": "ON",
+        # Set OUTPUT_ROOT to command line argument or default to source directory
+        "OUTPUT_ROOT": args.output_root or str(ROOT),
     }
     # Generic --enable_* flags
     for name, value in vars(args).items():
