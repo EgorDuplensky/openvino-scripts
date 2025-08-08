@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-import json
-import pandas as pd
 import argparse
+import json
+
+import pandas as pd
 
 
 def parse_args():
