@@ -15,8 +15,7 @@ def parse_args():
 
 
 def get_dataframe(path):
-    with open(path, 'r', newline=''):
-        return pd.read_csv(path, delimiter=';', header=0, index_col=0)
+    return pd.read_csv(path, delimiter=';', header=0, index_col=0)
 
 
 def aggregate(df, group_by):
