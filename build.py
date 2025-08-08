@@ -182,7 +182,7 @@ def _initial_env(args) -> None:
 
 def _compute_build_dir(args) -> str:
     suffix = ""
-    if args.arch != "x86":
+    if args.arch is not None:
         suffix = f"_{args.arch}"
     if args.threading == "OMP":
         suffix += "_omp"
