@@ -18,14 +18,8 @@ jobs:
         (contains(github.event.comment.body, '/check-shellcheck') ||
          contains(github.event.comment.body, '/check-all'))
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        ref: ${{ github.event.pull_request.head.ref }}
-    
     - name: Get PR details
       id: pr
       uses: actions/github-script@v7
@@ -38,13 +32,16 @@ jobs:
           });
           return {
             ref: pullRequest.head.ref,
-            sha: pullRequest.head.sha
+            sha: pullRequest.head.sha,
+            repo_full_name: pullRequest.head.repo.full_name
           };
     
     - name: Checkout PR branch
       uses: actions/checkout@v4
       with:
+        repository: ${{ fromJson(steps.pr.outputs.result).repo_full_name }}
         ref: ${{ fromJson(steps.pr.outputs.result).ref }}
+        token: ${{ secrets.GITHUB_TOKEN }}
         fetch-depth: 0
     
     - name: Install shellcheck
@@ -52,16 +49,16 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y shellcheck
     
-    - name: Run shellcheck on try-them-all-isa.sh
+    - name: Run shellcheck on all shell scripts
       id: shellcheck
       run: |
-        echo "Running shellcheck on try-them-all-isa.sh..."
-        if shellcheck try-them-all-isa.sh; then
+        echo "Running shellcheck on all shell scripts..."
+        if find . -name "*.sh" -exec shellcheck {} +; then
           echo "status=success" >> $GITHUB_OUTPUT
-          echo "message=✅ Shellcheck passed for try-them-all-isa.sh" >> $GITHUB_OUTPUT
+          echo "message=✅ All shell scripts passed shellcheck" >> $GITHUB_OUTPUT
         else
           echo "status=failure" >> $GITHUB_OUTPUT
-          echo "message=❌ Shellcheck failed for try-them-all-isa.sh" >> $GITHUB_OUTPUT
+          echo "message=❌ Some shell scripts failed shellcheck" >> $GITHUB_OUTPUT
           exit 1
         fi
     
@@ -80,5 +77,5 @@ jobs:
             state: state,
             target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
             description: description,
-            context: 'shellcheck/try-them-all-isa'
+            context: 'shellcheck/all-scripts'
           });
