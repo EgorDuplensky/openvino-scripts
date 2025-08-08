@@ -73,7 +73,10 @@ mlir,\
 enable-cc: \
 --name 'build.sh ' -- "$@")
 
-if [ $? != 0 ] ; then echo "Terminating..." >&2 ; exit 1 ; fi
+if ! eval set -- "$GETOPT"; then
+    echo "Terminating..." >&2
+    exit 1
+fi
 eval set -- "$GETOPT"
 
 while true; do
@@ -446,9 +449,11 @@ CMAKE_OPTIONS+=" -DCMAKE_INSTALL_PREFIX=${PWD}/install"
 # CMAKE_OPTIONS+=" -DTBB_DIR=./temp/tbb/cmake/"
 
 if [[ "$enable_cc" == "collect" ]]; then
+    # shellcheck source=/dev/null
     source "${current_dir}"/build_templates/openvino-lin-cc-collect
     build_dir="build_openvino-lin-cc-collect"
 elif [[ "$enable_cc" = "apply" ]]; then
+    # shellcheck source=/dev/null
     source "${current_dir}"/build_templates/openvino-lin-cc
     build_dir="build_openvino-lin-cc"
 fi
@@ -490,7 +495,7 @@ fi
 
 if [ "$generate" = true ]; then
     echo "Gerenerating cache ..."
-    eval cmake --log-level="$cmake_log_level" ${CMAKE_OPTIONS} ./ -B "${build_dir}"
+    eval cmake --log-level="$cmake_log_level" "${CMAKE_OPTIONS}" ./ -B "${build_dir}"
     # cmake --trace-expand --log-level=TRACE ${CMAKE_OPTIONS} ./ -B ${build_dir}
 fi
 
@@ -500,4 +505,4 @@ fi
 
 # num_of_build_jobs=9
 echo "Building ..."
-cmake --build "${build_dir}" --target ${target} --parallel ${num_of_build_jobs}
+cmake --build "${build_dir}" --target "${target}" --parallel ${num_of_build_jobs}

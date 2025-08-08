@@ -29,7 +29,8 @@ format_pr_list() {
     echo "Fetching your PRs with check status..."
     
     # Fetch all PR data with check status in one API call
-    local pr_data=$(gh pr list --author "@me" --repo "$REPO" --limit 50 \
+    local pr_data
+    pr_data=$(gh pr list --author "@me" --repo "$REPO" --limit 50 \
         --json number,title,author,headRefOid,statusCheckRollup)
     
     # Process the data to get CI state for each PR
@@ -66,7 +67,7 @@ format_pr_list() {
                 | length
             )
         }) | .[] | "\(.number)|\(.title)|@\(.author)|\(.headRefOid)|\(.ci_state)|\(.failed_count)|\(.pending_count)"
-    ' | while IFS='|' read -r number title author sha ci_state failed_count pending_count; do
+    ' | while IFS='|' read -r number title author _ ci_state failed_count pending_count; do
         # Format status indicator
         case "$ci_state" in
             "FAILURE") status="❌($failed_count)" ;;
@@ -151,8 +152,10 @@ format_jobs_list() {
 # Function to generate preview for job selection
 generate_job_preview() {
     local line="$1"
-    local type=$(echo "$line" | cut -d" " -f1)
-    local id=$(echo "$line" | cut -d" " -f2)
+    local type
+    local id
+    type=$(echo "$line" | cut -d" " -f1)
+    id=$(echo "$line" | cut -d" " -f2)
     
     if [[ "$type" == "github" ]]; then
         gh run view "$id" --repo "$REPO" --json jobs -q '.jobs[] | "Job: " + .name + " (" + .conclusion + ")"'
@@ -198,10 +201,10 @@ restart_github_job() {
 # Function to restart Jenkins job
 restart_jenkins_job() {
     local build_url="$1"
-    local job_name="$2"
     
     # Get CSRF crumb for Jenkins
-    local crumb=$(curl -s $TLS --netrc-file "$HOME/.authinfo" "$JENKINS_URL/crumbIssuer/api/json" 2>/dev/null | jq -r .crumb 2>/dev/null || echo "")
+    local crumb
+    crumb=$(curl -s $TLS --netrc-file "$HOME/.authinfo" "$JENKINS_URL/crumbIssuer/api/json" 2>/dev/null | jq -r .crumb 2>/dev/null || echo "")
     
     if [[ -z "$crumb" ]]; then
         return 1
@@ -240,7 +243,7 @@ echo "Restarting selected jobs..."
 success_count=0
 fail_count=0
 
-echo "$selected_runs" | while read -r line; do
+while read -r line; do
     job_type=$(echo "$line" | cut -d' ' -f1)
     job_id=$(echo "$line" | cut -d' ' -f3)
     workflow_name=$(echo "$line" | cut -d' ' -f5)
@@ -255,7 +258,7 @@ echo "$selected_runs" | while read -r line; do
         ((fail_count++))
     fi
     echo ""
-done
+done <<< "$selected_runs"
 
 echo "Summary:"
 echo "✅ Successfully restarted: $success_count jobs"
