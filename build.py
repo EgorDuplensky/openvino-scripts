@@ -33,7 +33,7 @@ ON_OFF_FLAGS = [
     # Debug
     "openvino-debug", "debug-caps",
     # Code quality
-    "clang-format", "clang-tidy", "cpplint",
+    "clang-format", "clang-tidy", "clang-tidy-fix", "cpplint",
     # Sanitizers
     "sanitizer", "thread_sanitizer", "ub_sanitizer",
     # Extra features,
