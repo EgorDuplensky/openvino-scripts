@@ -215,12 +215,12 @@ def _collect_cmake_defs(args) -> dict[str, str]:
     }
     # Generic --enable_* flags
     for name, value in vars(args).items():
-        if name.startswith("enable_") and isinstance(value, bool):
+        if name.startswith("enable_") and value is not None:
             if name in [f"enable_{fe}_frontend" for fe in FRONTENDS] + \
                        [f"enable_{pl}_plugin" for pl in PLUGINS]:
                 continue
-            key = name[len("enable_"):].upper()
-            defs[f"ENABLE_{key}"] = "ON" if value else "OFF"
+            key = name[len("enable_"):].replace("-", "_").upper()
+            defs[f"ENABLE_{key}"] = "ON" if (value == "on" or value is True) else "OFF"
     # Threading
     defs["THREADING"] = args.threading
     # Sanitizers
