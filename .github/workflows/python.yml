@@ -58,7 +58,7 @@ jobs:
       id: flake8
       run: |
         echo "Running flake8 on all Python scripts..."
-        if find . -name "*.py" -exec python3 -m flake8 {} +; then
+        if flake8; then
           echo "status=success" >> $GITHUB_OUTPUT
           echo "message=✅ All Python scripts passed flake8" >> $GITHUB_OUTPUT
         else
