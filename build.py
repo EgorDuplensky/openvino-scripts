@@ -29,11 +29,11 @@ import yaml
 
 # Reusable lists for frontends and plugins to avoid duplication
 # Flags that should accept ON/OFF instead of boolean
-ONOFF_FLAGS = [
+ON_OFF_FLAGS = [
     # Debug
     "openvino-debug", "debug-caps",
     # Code quality
-    "clang-format", "clang-tidy", "cppling",
+    "clang-format", "clang-tidy", "cpplint",
     # Sanitizers
     "sanitizer", "thread_sanitizer", "ub_sanitizer",
     # Extra features,
@@ -48,7 +48,13 @@ ONOFF_FLAGS = [
     # Test instrumentation and profiling
     "profiling-itt", "coverage", "fuzzing",
     # Build toggles
-    "lto", "faster-build", "intergritycheck", "qspectre",
+    "lto", "faster-build", "integritycheck", "qspectre",
+    # API
+    "cpp-api", "python-api", "genai-api",
+    # Notebooks
+    "notebooks",
+    # OVMS
+    "ovms",
     # Extra
     "cpu-specific-target-per-test"
 ]
@@ -98,7 +104,7 @@ def _build_parser() -> argparse.ArgumentParser:
                    help='The maximum number of concurrent processes to use when building')
 
     # Feature toggles (on / off)
-    for flag in ONOFF_FLAGS:
+    for flag in ON_OFF_FLAGS:
         p.add_argument(
             f"--enable-{flag}",
             choices=["on", "off"],
@@ -107,14 +113,14 @@ def _build_parser() -> argparse.ArgumentParser:
 
     # Another way to enable plugins
     p.add_argument(
-        "--enable-plugins", nargs='+', choices=PLUGINS,
+        "--plugins", nargs='+', choices=PLUGINS,
         metavar="PLUGINS",
         help=f"List of plugins to enable (choices: {', '.join(PLUGINS)})"
     )
 
     # Another way to frontends plugins
     p.add_argument(
-        "--enable-frontends", nargs='+', choices=FRONTENDS,
+        "--frontends", nargs='+', choices=FRONTENDS,
         metavar="FRONTENDS",
         help=f"List of front-ends to enable (choices: {', '.join(FRONTENDS)})"
     )
@@ -145,6 +151,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--linux-perf", action="store_true", help="Add flags useful for Linux perf")
     p.add_argument("--native-compilation", action="store_true", help="Enable -march=native")
     p.add_argument("--use-mold", action="store_true", help="Use mold linker")
+    p.add_argument("--use-ninja", action="store_true", help="Use Ninja build system")
     p.add_argument("--use-clang", metavar="VER", help="Use specific clang version")
     # Verbosity
     p.add_argument("-v", dest="verbose", action="count", help="Increase verbosity (-v, -vv, -vvv)", default=1)
@@ -207,20 +214,25 @@ def _compute_build_dir(args) -> str:
 def _collect_cmake_defs(args) -> dict[str, str]:
     defs: dict[str, str] = {
         "CMAKE_BUILD_TYPE": args.build_type,
-        "ENABLE_CPP_API": "ON",
-        # Always enable GAPI preprocessing as in original script
-        "ENABLE_GAPI_PREPROCESSING": "ON",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         # Set OUTPUT_ROOT to command line argument or default to source directory
         "OUTPUT_ROOT": args.output_root or str(ROOT),
     }
+
     # Generic --enable_* flags
     for name, value in vars(args).items():
-        if name.startswith("enable_") and isinstance(value, bool):
+        if name.startswith("enable_"):
             if name in [f"enable_{fe}_frontend" for fe in FRONTENDS] + \
                        [f"enable_{pl}_plugin" for pl in PLUGINS]:
                 continue
+
             key = name[len("enable_"):].upper()
-            defs[f"ENABLE_{key}"] = "ON" if value else "OFF"
+            if value in ("on", "off"):
+                defs[f"ENABLE_{key}"] = value.upper()
+            elif value is not None:
+                flag_name = name[len('enable_'):]
+                raise ValueError(f"Invalid value '{value}' for --enable-{flag_name}. Expected 'on' or 'off'.")
+
     # Threading
     defs["THREADING"] = args.threading
     # Sanitizers
@@ -238,8 +250,8 @@ def _collect_cmake_defs(args) -> dict[str, str]:
         defs["CMAKE_CXX_COMPILER_LAUNCHER"] = "ccache"
     # Frontends
     fe_list = set()
-    if args.enable_frontends:
-        fe_list.update(args.enable_frontends)
+    if args.frontends:
+        fe_list.update(args.frontends)
     for fe in FRONTENDS:
         if getattr(args, f"enable_{fe}_frontend", False):
             fe_list.add(fe)
@@ -247,8 +259,8 @@ def _collect_cmake_defs(args) -> dict[str, str]:
         defs[f"ENABLE_OV_{fe.upper()}_FRONTEND"] = "ON" if fe in fe_list else "OFF"
     # Plugins
     pl_list = set()
-    if args.enable_plugins:
-        pl_list.update(args.enable_plugins)
+    if args.plugins:
+        pl_list.update(args.plugins)
     for pl in PLUGINS:
         if getattr(args, f"enable_{pl}_plugin", False):
             pl_list.add(pl)
@@ -289,18 +301,16 @@ def _cmake_options(args) -> List[str]:
     return [f"-D{k}={v}" for k, v in _collect_cmake_defs(args).items()]
 
 
-def add_arg(cmd: list[str], flag: str, value):
+def add_arg(cmd: list[str], flag: str, value=None):
     """
     - If value is truthy and not a list/tuple → append flag + single value
     - If value is a list/tuple         → append flag + all values
-    - If value is True (boolean flag)  → append flag only
-    - Otherwise (value is False/None)  → do nothing
+    - If value is None or True (boolean flag)  → append flag only
     """
-    if not value:
-        # No value to add, skip
-        return
-
-    if value is True:
+    if value is None:
+        # flag with no value
+        cmd.append(flag)
+    elif value is True:
         # boolean flag, no value
         cmd.append(flag)
     elif isinstance(value, (list, tuple)):
@@ -385,6 +395,7 @@ def import_if_provided(parser: argparse.ArgumentParser) -> tuple[argparse.Namesp
     # Restore import_file and ignore_config flags
     args.import_file = known_args.import_file
     args.ignore_config = known_args.ignore_config
+
     return args, defaults
 
 
@@ -440,23 +451,30 @@ def run() -> None:
         )
         sys.stdout.write(code)
         sys.exit(0)
+
     # Validate selective compilation
     if args.enable_cc == 'apply' and not args.cc_stat_file:
         print("Error: --cc-stat-file is required when --enable-cc apply", file=sys.stderr)
         sys.exit(1)
+
     # Strip argparse sentinel
     if '--' in args.target and not args.target[0]:
         args.target = args.target[1:]
+
     # Locate CMake
     cmake_path = shutil.which('cmake')
     if not cmake_path:
         print('Error: cmake not found in PATH', file=sys.stderr)
         sys.exit(1)
-    generator = ['-G', 'Ninja'] if shutil.which('ninja') else []
+
+    # @todo: Consider fallback behavior when ninja is not available
+    generator = ['-G', 'Ninja'] if args.use_ninja and shutil.which('ninja') else []
     # Prepare build dir
     build_dir = Path(_compute_build_dir(args))
     build_dir.mkdir(parents=True, exist_ok=True)
     _initial_env(args)
+
+    # quiet overrules verbosity
     if args.quiet:
         args.verbose = 0
 
@@ -484,11 +502,12 @@ def run() -> None:
     # Build step
     build_cmd = [cmake_path, '--build', str(build_dir)]
 
-    # 2) Single-value argument:
     add_arg(build_cmd, '--parallel', args.parallel)
 
-    # 3) Multi-value argument:
     add_arg(build_cmd, '--target', args.target)
+
+    if args.verbose == 0:
+        add_arg(build_cmd, '--', '--quiet')
 
     subprocess.run(build_cmd, check=True)
 
