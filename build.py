@@ -48,7 +48,7 @@ ON_OFF_FLAGS = [
     # Test instrumentation and profiling
     "profiling-itt", "coverage", "fuzzing",
     # Build toggles
-    "lto", "faster-build", "intergritycheck", "qspectre",
+    "lto", "faster-build", "integritycheck", "qspectre",
     # API
     "cpp-api", "python-api", "genai-api",
     # Notebooks
@@ -113,14 +113,14 @@ def _build_parser() -> argparse.ArgumentParser:
 
     # Another way to enable plugins
     p.add_argument(
-        "--enable-plugins", nargs='+', choices=PLUGINS,
+        "--plugins", nargs='+', choices=PLUGINS,
         metavar="PLUGINS",
         help=f"List of plugins to enable (choices: {', '.join(PLUGINS)})"
     )
 
     # Another way to frontends plugins
     p.add_argument(
-        "--enable-frontends", nargs='+', choices=FRONTENDS,
+        "--frontends", nargs='+', choices=FRONTENDS,
         metavar="FRONTENDS",
         help=f"List of front-ends to enable (choices: {', '.join(FRONTENDS)})"
     )
@@ -214,7 +214,7 @@ def _compute_build_dir(args) -> str:
 def _collect_cmake_defs(args) -> dict[str, str]:
     defs: dict[str, str] = {
         "CMAKE_BUILD_TYPE": args.build_type,
-        "ENABLE_CPP_API": "ON",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         # Set OUTPUT_ROOT to command line argument or default to source directory
         "OUTPUT_ROOT": args.output_root or str(ROOT),
     }
@@ -225,8 +225,15 @@ def _collect_cmake_defs(args) -> dict[str, str]:
             if name in [f"enable_{fe}_frontend" for fe in FRONTENDS] + \
                        [f"enable_{pl}_plugin" for pl in PLUGINS]:
                 continue
+
             key = name[len("enable_"):].upper()
-            defs[f"ENABLE_{key}"] = "ON" if value else "OFF"
+            if value == "on":
+                defs[f"ENABLE_{key}"] = "ON"
+            elif value == "off":
+                defs[f"ENABLE_{key}"] = "OFF"
+            elif value is not None:
+                flag_name = name[len('enable_'):]
+                raise ValueError(f"Invalid value '{value}' for --enable-{flag_name}. Expected 'on' or 'off'.")
 
     # Threading
     defs["THREADING"] = args.threading
@@ -245,8 +252,8 @@ def _collect_cmake_defs(args) -> dict[str, str]:
         defs["CMAKE_CXX_COMPILER_LAUNCHER"] = "ccache"
     # Frontends
     fe_list = set()
-    if args.enable_frontends:
-        fe_list.update(args.enable_frontends)
+    if args.frontends:
+        fe_list.update(args.frontends)
     for fe in FRONTENDS:
         if getattr(args, f"enable_{fe}_frontend", False):
             fe_list.add(fe)
@@ -254,8 +261,8 @@ def _collect_cmake_defs(args) -> dict[str, str]:
         defs[f"ENABLE_OV_{fe.upper()}_FRONTEND"] = "ON" if fe in fe_list else "OFF"
     # Plugins
     pl_list = set()
-    if args.enable_plugins:
-        pl_list.update(args.enable_plugins)
+    if args.plugins:
+        pl_list.update(args.plugins)
     for pl in PLUGINS:
         if getattr(args, f"enable_{pl}_plugin", False):
             pl_list.add(pl)
@@ -295,17 +302,17 @@ def _collect_cmake_defs(args) -> dict[str, str]:
 def _cmake_options(args) -> List[str]:
     return [f"-D{k}={v}" for k, v in _collect_cmake_defs(args).items()]
 
-def add_arg(cmd: list[str], flag: str, value = None):
+
+def add_arg(cmd: list[str], flag: str, value=None):
     """
     - If value is truthy and not a list/tuple → append flag + single value
     - If value is a list/tuple         → append flag + all values
-    - If value is True (boolean flag)  → append flag only
-    - Otherwise (value is False/None)  → do nothing
+    - If value is None or True (boolean flag)  → append flag only
     """
-    if not value:
+    if value is None:
+        # flag with no value
         cmd.append(flag)
-
-    if value is True:
+    elif value is True:
         # boolean flag, no value
         cmd.append(flag)
     elif isinstance(value, (list, tuple)):
@@ -501,7 +508,7 @@ def run() -> None:
 
     add_arg(build_cmd, '--target', args.target)
 
-    if (args.verbose == 0):
+    if args.verbose == 0:
         add_arg(build_cmd, '--', '--quiet')
 
     subprocess.run(build_cmd, check=True)
