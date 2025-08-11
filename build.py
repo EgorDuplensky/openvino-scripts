@@ -100,7 +100,7 @@ def _build_parser() -> argparse.ArgumentParser:
     # Build type
     p.add_argument("-b", "--build-type", metavar="TYPE", default="Release",
                    choices=["Release", "Debug", "RelWithDebInfo"], help="CMAKE_BUILD_TYPE")
-    p.add_argument('-j', '--parallel', type=int, default=0,
+    p.add_argument('-j', '--parallel', type=int, default=_nprocs_minus_two(),
                    help='The maximum number of concurrent processes to use when building')
 
     # Feature toggles (on / off)
