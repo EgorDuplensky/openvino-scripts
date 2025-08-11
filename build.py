@@ -215,7 +215,7 @@ def _collect_cmake_defs(args) -> dict[str, str]:
     }
     # Generic --enable_* flags
     for name, value in vars(args).items():
-        if name.startswith("enable_") and value is not None:
+        if name.startswith("enable_") and isinstance(value, (bool, str)):
             if name in [f"enable_{fe}_frontend" for fe in FRONTENDS] + \
                        [f"enable_{pl}_plugin" for pl in PLUGINS]:
                 continue
