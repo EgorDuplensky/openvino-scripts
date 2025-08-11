@@ -227,10 +227,8 @@ def _collect_cmake_defs(args) -> dict[str, str]:
                 continue
 
             key = name[len("enable_"):].upper()
-            if value == "on":
-                defs[f"ENABLE_{key}"] = "ON"
-            elif value == "off":
-                defs[f"ENABLE_{key}"] = "OFF"
+            if value in ("on", "off"):
+                defs[f"ENABLE_{key}"] = value.upper()
             elif value is not None:
                 flag_name = name[len('enable_'):]
                 raise ValueError(f"Invalid value '{value}' for --enable-{flag_name}. Expected 'on' or 'off'.")
