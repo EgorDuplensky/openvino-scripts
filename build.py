@@ -29,11 +29,11 @@ import yaml
 
 # Reusable lists for frontends and plugins to avoid duplication
 # Flags that should accept ON/OFF instead of boolean
-ONOFF_FLAGS = [
+ON_OFF_FLAGS = [
     # Debug
     "openvino-debug", "debug-caps",
     # Code quality
-    "clang-format", "clang-tidy", "cppling",
+    "clang-format", "clang-tidy", "cpplint",
     # Sanitizers
     "sanitizer", "thread_sanitizer", "ub_sanitizer",
     # Extra features,
@@ -49,6 +49,12 @@ ONOFF_FLAGS = [
     "profiling-itt", "coverage", "fuzzing",
     # Build toggles
     "lto", "faster-build", "intergritycheck", "qspectre",
+    # API
+    "cpp-api", "python-api", "genai-api",
+    # Notebooks
+    "notebooks",
+    # OVMS
+    "ovms",
     # Extra
     "cpu-specific-target-per-test"
 ]
@@ -98,7 +104,7 @@ def _build_parser() -> argparse.ArgumentParser:
                    help='The maximum number of concurrent processes to use when building')
 
     # Feature toggles (on / off)
-    for flag in ONOFF_FLAGS:
+    for flag in ON_OFF_FLAGS:
         p.add_argument(
             f"--enable-{flag}",
             choices=["on", "off"],
@@ -145,6 +151,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--linux-perf", action="store_true", help="Add flags useful for Linux perf")
     p.add_argument("--native-compilation", action="store_true", help="Enable -march=native")
     p.add_argument("--use-mold", action="store_true", help="Use mold linker")
+    p.add_argument("--use-ninja", action="store_true", help="Use Ninja build system")
     p.add_argument("--use-clang", metavar="VER", help="Use specific clang version")
     # Verbosity
     p.add_argument("-v", dest="verbose", action="count", help="Increase verbosity (-v, -vv, -vvv)", default=1)
@@ -208,19 +215,19 @@ def _collect_cmake_defs(args) -> dict[str, str]:
     defs: dict[str, str] = {
         "CMAKE_BUILD_TYPE": args.build_type,
         "ENABLE_CPP_API": "ON",
-        # Always enable GAPI preprocessing as in original script
-        "ENABLE_GAPI_PREPROCESSING": "ON",
         # Set OUTPUT_ROOT to command line argument or default to source directory
         "OUTPUT_ROOT": args.output_root or str(ROOT),
     }
+
     # Generic --enable_* flags
     for name, value in vars(args).items():
-        if name.startswith("enable_") and isinstance(value, bool):
+        if name.startswith("enable_"):
             if name in [f"enable_{fe}_frontend" for fe in FRONTENDS] + \
                        [f"enable_{pl}_plugin" for pl in PLUGINS]:
                 continue
             key = name[len("enable_"):].upper()
             defs[f"ENABLE_{key}"] = "ON" if value else "OFF"
+
     # Threading
     defs["THREADING"] = args.threading
     # Sanitizers
@@ -288,8 +295,7 @@ def _collect_cmake_defs(args) -> dict[str, str]:
 def _cmake_options(args) -> List[str]:
     return [f"-D{k}={v}" for k, v in _collect_cmake_defs(args).items()]
 
-
-def add_arg(cmd: list[str], flag: str, value):
+def add_arg(cmd: list[str], flag: str, value = None):
     """
     - If value is truthy and not a list/tuple → append flag + single value
     - If value is a list/tuple         → append flag + all values
@@ -297,8 +303,7 @@ def add_arg(cmd: list[str], flag: str, value):
     - Otherwise (value is False/None)  → do nothing
     """
     if not value:
-        # No value to add, skip
-        return
+        cmd.append(flag)
 
     if value is True:
         # boolean flag, no value
@@ -385,6 +390,7 @@ def import_if_provided(parser: argparse.ArgumentParser) -> tuple[argparse.Namesp
     # Restore import_file and ignore_config flags
     args.import_file = known_args.import_file
     args.ignore_config = known_args.ignore_config
+
     return args, defaults
 
 
@@ -440,23 +446,30 @@ def run() -> None:
         )
         sys.stdout.write(code)
         sys.exit(0)
+
     # Validate selective compilation
     if args.enable_cc == 'apply' and not args.cc_stat_file:
         print("Error: --cc-stat-file is required when --enable-cc apply", file=sys.stderr)
         sys.exit(1)
+
     # Strip argparse sentinel
     if '--' in args.target and not args.target[0]:
         args.target = args.target[1:]
+
     # Locate CMake
     cmake_path = shutil.which('cmake')
     if not cmake_path:
         print('Error: cmake not found in PATH', file=sys.stderr)
         sys.exit(1)
-    generator = ['-G', 'Ninja'] if shutil.which('ninja') else []
+
+    # @todo: Consider fallback behavior when ninja is not available
+    generator = ['-G', 'Ninja'] if args.use_ninja and shutil.which('ninja') else []
     # Prepare build dir
     build_dir = Path(_compute_build_dir(args))
     build_dir.mkdir(parents=True, exist_ok=True)
     _initial_env(args)
+
+    # quiet overrules verbosity
     if args.quiet:
         args.verbose = 0
 
@@ -484,11 +497,12 @@ def run() -> None:
     # Build step
     build_cmd = [cmake_path, '--build', str(build_dir)]
 
-    # 2) Single-value argument:
     add_arg(build_cmd, '--parallel', args.parallel)
 
-    # 3) Multi-value argument:
     add_arg(build_cmd, '--target', args.target)
+
+    if (args.verbose == 0):
+        add_arg(build_cmd, '--', '--quiet')
 
     subprocess.run(build_cmd, check=True)
 
