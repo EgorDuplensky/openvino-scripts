@@ -100,7 +100,7 @@ def _build_parser() -> argparse.ArgumentParser:
     # Build type
     p.add_argument("-b", "--build-type", metavar="TYPE", default="Release",
                    choices=["Release", "Debug", "RelWithDebInfo"], help="CMAKE_BUILD_TYPE")
-    p.add_argument('-j', '--parallel', type=int, default=0,
+    p.add_argument("-j", "--parallel", nargs="?", const=-1, type=int, default=None,
                    help='The maximum number of concurrent processes to use when building')
 
     # Feature toggles (on / off)
@@ -490,7 +490,6 @@ def run() -> None:
     if args.verbose > 2:
         print('CMake command:', ' '.join(cmake_cmd))
         print('Build dir:', build_dir)
-        # print(f"Building with {num_jobs} jobs...")
 
     # Configure step
     if args.configure and args.configure > 0:
@@ -502,12 +501,19 @@ def run() -> None:
     # Build step
     build_cmd = [cmake_path, '--build', str(build_dir)]
 
-    add_arg(build_cmd, '--parallel', args.parallel)
+    if args.parallel is not None:
+        if args.parallel != -1:
+            add_arg(build_cmd, '--parallel', args.parallel)
+        else:
+            add_arg(build_cmd, '--parallel')
 
     add_arg(build_cmd, '--target', args.target)
 
     if args.verbose == 0:
         add_arg(build_cmd, '--', '--quiet')
+
+    if args.verbose > 2:
+        print('Build command:', ' '.join(build_cmd))
 
     subprocess.run(build_cmd, check=True)
 
