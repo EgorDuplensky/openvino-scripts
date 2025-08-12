@@ -62,7 +62,7 @@ ON_OFF_FLAGS = [
 FRONTENDS = ["onnx", "paddle", "tf", "tf_lite", "pytorch", "ir", "jax"]
 PLUGINS = [
     "intel_cpu", "intel_gpu", "intel_npu",
-    "hetero", "multi", "auto", "template", "auto_batch", "auto_proxy"
+    "hetero", "multi", "auto", "template", "auto_batch", "proxy",
 ]
 
 ROOT = Path.cwd()
