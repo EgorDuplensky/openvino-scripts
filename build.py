@@ -256,7 +256,7 @@ def _collect_cmake_defs(args) -> dict[str, str]:
         if getattr(args, f"enable_{fe}", False):
             fe_list.add(fe)
     for fe in FRONTENDS:
-        defs[f"ENABLE_OV_{fe.upper()}_FRONTEND"] = "ON" if fe in fe_list else "OFF"
+        defs[f"ENABLE_OV_{fe.upper()}"] = "ON" if fe in fe_list else "OFF"
     # Plugins
     pl_list = set()
     if args.plugins:
