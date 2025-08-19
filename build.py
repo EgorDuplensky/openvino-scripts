@@ -458,7 +458,7 @@ def run() -> None:
         sys.exit(1)
 
     # Strip argparse sentinel
-    if args.target and args.target[0] == "--":
+    if args.target and len(args.target) > 0 and args.target[0] == "--":
         args.target = args.target[1:]
 
     # Locate CMake
