@@ -458,7 +458,7 @@ def run() -> None:
         sys.exit(1)
 
     # Strip argparse sentinel
-    if '--' in args.target and not args.target[0]:
+    if args.target and args.target[0] == "--":
         args.target = args.target[1:]
 
     # Locate CMake
@@ -507,7 +507,8 @@ def run() -> None:
         else:
             add_arg(build_cmd, '--parallel')
 
-    add_arg(build_cmd, '--target', args.target)
+    if args.target:
+        add_arg(build_cmd, '--target', args.target)
 
     if args.verbose == 0:
         add_arg(build_cmd, '--', '--quiet')
