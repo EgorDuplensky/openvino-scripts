@@ -28,7 +28,8 @@ from typing import List
 import yaml
 
 FRONTENDS = ["onnx_frontend", "paddle_frontend", "tf_frontend",
-             "tf_lite_frontend", "pytorch", "ir", "jax"]
+             "tf_lite_frontend", "pytorch_frontend", "ir_frontend",
+             "jax_frontend"]
 PLUGINS = [
     "intel_cpu", "intel_gpu", "intel_npu",
     "hetero", "multi", "auto", "template", "auto_batch", "proxy",
