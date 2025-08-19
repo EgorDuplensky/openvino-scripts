@@ -27,43 +27,44 @@ from typing import List
 # External package, json is too verbose
 import yaml
 
-# Reusable lists for frontends and plugins to avoid duplication
+FRONTENDS = ["onnx_frontend", "paddle_frontend", "tf_frontend",
+             "tf_lite_frontend", "pytorch_frontend", "ir_frontend",
+             "jax_frontend"]
+PLUGINS = [
+    "intel_cpu", "intel_gpu", "intel_npu",
+    "hetero", "multi", "auto", "template", "auto_batch", "proxy",
+]
+
 # Flags that should accept ON/OFF instead of boolean
 ON_OFF_FLAGS = [
     # Debug
-    "openvino-debug", "debug-caps",
+    "openvino_debug", "debug_caps",
     # Code quality
-    "clang-format", "clang-tidy", "clang-tidy-fix", "cpplint",
+    "clang_format", "clang_tidy", "clang_tidy_fix", "cpplint",
     # Sanitizers
     "sanitizer", "thread_sanitizer", "ub_sanitizer",
     # Extra features,
     "python", "wheel", "samples", "tests", "docs",
     # System provided dependencies
-    "system-pugixml", "system-snappy", "system-opencl", "system-tbb",
-    "system-protobuf", "system-flatbuffers", "tbbbind-2-5",
+    "system_pugixml", "system_snappy", "system_opencl", "system_tbb",
+    "system_protobuf", "system_flatbuffers", "tbbbind_2_5",
     # Binary size optimizations
     "sse42", "avx2", "avx512f",
     # Extra third party
-    "mlas-for-cpu", "kleidiai-for-cpu",
+    "mlas_for_cpu", "kleidiai_for_cpu",
     # Test instrumentation and profiling
-    "profiling-itt", "coverage", "fuzzing",
+    "profiling_itt", "coverage", "fuzzing",
     # Build toggles
-    "lto", "faster-build", "integritycheck", "qspectre",
+    "lto", "faster_build", "integritycheck", "qspectre",
     # API
-    "cpp-api", "python-api", "genai-api",
+    "cpp_api", "python_api", "genai_api",
     # Notebooks
     "notebooks",
     # OVMS
     "ovms",
     # Extra
-    "cpu-specific-target-per-test"
-]
-
-FRONTENDS = ["onnx", "paddle", "tf", "tf_lite", "pytorch", "ir", "jax"]
-PLUGINS = [
-    "intel_cpu", "intel_gpu", "intel_npu",
-    "hetero", "multi", "auto", "template", "auto_batch", "proxy",
-]
+    "cpu_specific_target_per_test"
+] + PLUGINS + FRONTENDS
 
 ROOT = Path.cwd()
 
@@ -106,9 +107,9 @@ def _build_parser() -> argparse.ArgumentParser:
     # Feature toggles (on / off)
     for flag in ON_OFF_FLAGS:
         p.add_argument(
-            f"--enable-{flag}",
+            f"--enable-{flag.replace('_', '-')}",
             choices=["on", "off"],
-            help=f"Enable {flag.replace('-', ' ')} (on / off)"
+            help=f"ENABLE_{flag.upper()} (ON / OFF)"
         )
 
     # Another way to enable plugins
@@ -222,8 +223,8 @@ def _collect_cmake_defs(args) -> dict[str, str]:
     # Generic --enable_* flags
     for name, value in vars(args).items():
         if name.startswith("enable_"):
-            if name in [f"enable_{fe}_frontend" for fe in FRONTENDS] + \
-                       [f"enable_{pl}_plugin" for pl in PLUGINS]:
+            if name in [f"enable_{fe}" for fe in FRONTENDS] + \
+                       [f"enable_{pl}" for pl in PLUGINS]:
                 continue
 
             key = name[len("enable_"):].upper()
@@ -253,16 +254,16 @@ def _collect_cmake_defs(args) -> dict[str, str]:
     if args.frontends:
         fe_list.update(args.frontends)
     for fe in FRONTENDS:
-        if getattr(args, f"enable_{fe}_frontend", False):
+        if getattr(args, f"enable_{fe}", False):
             fe_list.add(fe)
     for fe in FRONTENDS:
-        defs[f"ENABLE_OV_{fe.upper()}_FRONTEND"] = "ON" if fe in fe_list else "OFF"
+        defs[f"ENABLE_OV_{fe.upper()}"] = "ON" if fe in fe_list else "OFF"
     # Plugins
     pl_list = set()
     if args.plugins:
         pl_list.update(args.plugins)
     for pl in PLUGINS:
-        if getattr(args, f"enable_{pl}_plugin", False):
+        if getattr(args, f"enable_{pl}", False):
             pl_list.add(pl)
     for pl in PLUGINS:
         defs[f"ENABLE_{pl.upper()}"] = "ON" if pl in pl_list else "OFF"
