@@ -148,15 +148,19 @@ def _build_parser() -> argparse.ArgumentParser:
     # Architecture
     p.add_argument("-a", "--arch", choices=["x86", "arm", "arm32", "riscv"],
                    help="Target architecture for cross-compilation")
+    p.add_argument("--native-compilation", action="store_true", help="Enable -march=native")
+    # Profiling
     p.add_argument("-u", "--gprof", action="store_true", help="Enable gprof instrumentation")
     p.add_argument("--linux-perf", action="store_true", help="Add flags useful for Linux perf")
-    p.add_argument("--native-compilation", action="store_true", help="Enable -march=native")
+    # Tooling
     p.add_argument("--use-mold", action="store_true", help="Use mold linker")
     p.add_argument("--use-ninja", action="store_true", help="Use Ninja build system")
     p.add_argument("--use-clang", metavar="VER", help="Use specific clang version")
     # Verbosity
     p.add_argument("-v", dest="verbose", action="count", help="Increase verbosity (-v, -vv, -vvv)", default=1)
-    p.add_argument("-q", "--quiet", action="store_true", help="Don't show any progress status")
+    p.add_argument("-q", "--quiet", action="count",
+                   help="Reduce build verbosity (-q: disable rule messages, -qq: disable rule and target messages)",
+                   default=0)
     # Shell completion emission
     p.add_argument("--completion", choices=["bash", "zsh", "fish"],
                    help="Generate shell completion script for specified shell")
@@ -219,6 +223,13 @@ def _collect_cmake_defs(args) -> dict[str, str]:
         # Set OUTPUT_ROOT to command line argument or default to source directory
         "OUTPUT_ROOT": args.output_root or str(ROOT),
     }
+
+    # Add quiet mode cmake option
+    if not args.use_ninja:
+        if args.quiet >= 1:
+            defs["CMAKE_RULE_MESSAGES"] = "OFF"
+        if args.quiet >= 2:
+            defs["CMAKE_TARGET_MESSAGES"] = "OFF"
 
     # Generic --enable_* flags
     for name, value in vars(args).items():
@@ -476,7 +487,7 @@ def run() -> None:
     _initial_env(args)
 
     # quiet overrules verbosity
-    if args.quiet:
+    if args.quiet > 0:
         args.verbose = 0
 
     cmake_cmd = [
