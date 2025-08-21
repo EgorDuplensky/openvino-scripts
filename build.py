@@ -70,15 +70,25 @@ ROOT = Path.cwd()
 
 
 def find_repo_root() -> Path:
-    """Locate the repository root by searching for CMakeLists.txt upwards from cwd."""
-    p = Path.cwd()
-    while True:
-        if (p / "CMakeLists.txt").exists():
-            return p
-        if p.parent == p:
-            print("Error: Could not find repository root (no CMakeLists.txt found)", file=sys.stderr)
+    """Locate the repository root using git."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        root = Path(result.stdout.strip())
+        if not root.exists():
+            print("Error: Failed to find OpenVINO repository root", file=sys.stderr)
             sys.exit(1)
-        p = p.parent
+        return root
+    except subprocess.CalledProcessError:
+        print("Error: Not in a git repository", file=sys.stderr)
+        sys.exit(1)
+    except FileNotFoundError:
+        print("Error: git command not found", file=sys.stderr)
+        sys.exit(1)
 
 
 def _nprocs_minus_two() -> int:
