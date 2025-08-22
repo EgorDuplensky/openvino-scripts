@@ -66,8 +66,6 @@ ON_OFF_FLAGS = [
     "cpu_specific_target_per_test"
 ] + PLUGINS + FRONTENDS
 
-ROOT = Path.cwd()
-
 
 def find_repo_root() -> Path:
     """Locate the repository root using git."""
@@ -226,12 +224,12 @@ def _compute_build_dir(args) -> str:
     return f"build_{args.build_type}{suffix}"
 
 
-def _collect_cmake_defs(args) -> dict[str, str]:
+def _collect_cmake_defs(args, root_path: Path) -> dict[str, str]:
     defs: dict[str, str] = {
         "CMAKE_BUILD_TYPE": args.build_type,
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         # Set OUTPUT_ROOT to command line argument or default to source directory
-        "OUTPUT_ROOT": args.output_root or str(ROOT),
+        "OUTPUT_ROOT": args.output_root or str(root_path),
     }
 
     # Add quiet mode cmake option
@@ -319,8 +317,8 @@ def _collect_cmake_defs(args) -> dict[str, str]:
     return defs
 
 
-def _cmake_options(args) -> List[str]:
-    return [f"-D{k}={v}" for k, v in _collect_cmake_defs(args).items()]
+def _cmake_options(args, root_path: Path) -> List[str]:
+    return [f"-D{k}={v}" for k, v in _collect_cmake_defs(args, root_path).items()]
 
 
 def add_arg(cmd: list[str], flag: str, value=None):
@@ -454,6 +452,7 @@ def export_args(parser: argparse.ArgumentParser, args: argparse.Namespace, defau
 
 
 def run() -> None:
+    root = find_repo_root()
     parser = _build_parser()
     args, defaults = import_if_provided(parser)
 
@@ -504,8 +503,8 @@ def run() -> None:
         cmake_path,
         *generator,
         f"--log-level={'DEBUG' if args.verbose else 'ERROR'}",
-        *_cmake_options(args),
-        str(ROOT),
+        *_cmake_options(args, root),
+        str(root),
         '-B', str(build_dir)
     ]
 
@@ -515,7 +514,7 @@ def run() -> None:
 
     # Configure step
     if args.configure and args.configure > 0:
-        subprocess.run(cmake_cmd, check=True)
+        subprocess.run(cmake_cmd, check=True, cwd=root)
         # Exit after configure if -cc or --configure-only
         if (args.configure and args.configure > 1):
             return
@@ -538,7 +537,7 @@ def run() -> None:
     if args.verbose > 2:
         print('Build command:', ' '.join(build_cmd))
 
-    subprocess.run(build_cmd, check=True)
+    subprocess.run(build_cmd, check=True, cwd=root)
 
 
 if __name__ == '__main__':
