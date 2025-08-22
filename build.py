@@ -183,10 +183,10 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--cmake-extra-defines", nargs="+",
                    help="Extra CMake definitions (-D<key>=<value>). Provide as <key>=<value>.")
 
-    p.add_argument("--cmake-extra-configure-args", nargs="+", action="append",
+    p.add_argument("--cmake-extra-configure-args", nargs="+",
                    help="Extra CMake configure arguments (e.g., -G, --debug-output)")
 
-    p.add_argument("--cmake-extra-build-args", nargs="+", action="append",
+    p.add_argument("--cmake-extra-build-args", nargs="+",
                    help="Extra CMake build arguments (e.g., --verbose, --config)")
     # Target list
     p.add_argument("target", nargs=argparse.REMAINDER,
@@ -529,8 +529,7 @@ def run() -> None:
 
     # Add extra CMake configure args
     if args.cmake_extra_configure_args:
-        for arg_group in args.cmake_extra_configure_args:
-            cmake_cmd.extend(arg_group)
+        cmake_cmd.extend(args.cmake_extra_configure_args)
 
     if args.verbose > 2:
         print('CMake command:', ' '.join(cmake_cmd))
@@ -557,8 +556,7 @@ def run() -> None:
 
     # Add extra CMake build args
     if args.cmake_extra_build_args:
-        for arg_group in args.cmake_extra_build_args:
-            build_cmd.extend(arg_group)
+        build_cmd.extend(args.cmake_extra_build_args)
 
     if args.verbose == 0:
         add_arg(build_cmd, '--', '--quiet')
