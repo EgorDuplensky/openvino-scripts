@@ -27,9 +27,7 @@ from typing import List
 # External package, json is too verbose
 import yaml
 
-FRONTENDS = ["onnx_frontend", "paddle_frontend", "tf_frontend",
-             "tf_lite_frontend", "pytorch_frontend", "ir_frontend",
-             "jax_frontend"]
+FRONTENDS = ["onnx", "paddle", "tf", "tf_lite", "pytorch", "ir", "jax"]
 PLUGINS = [
     "intel_cpu", "intel_gpu", "intel_npu",
     "hetero", "multi", "auto", "template", "auto_batch", "proxy",
@@ -64,7 +62,7 @@ ON_OFF_FLAGS = [
     "ovms",
     # Extra
     "cpu_specific_target_per_test"
-] + PLUGINS + FRONTENDS
+] + PLUGINS + [f"ov_{fe}_frontend" for fe in FRONTENDS]
 
 
 def find_repo_root() -> Path:
@@ -255,37 +253,17 @@ def _collect_cmake_defs(args, root_path: Path) -> dict[str, str]:
 
     # Threading
     defs["THREADING"] = args.threading
-    # Sanitizers
-    if args.enable_sanitizer:
-        san_map = {
-            "asan": "ENABLE_SANITIZER",
-            "tsan": "ENABLE_THREAD_SANITIZER",
-            "usan": "ENABLE_UB_SANITIZER",
-            "msan": "ENABLE_MEMORY_SANITIZER",
-        }
-        defs[san_map[args.enable_sanitizer]] = "ON"
-        defs["BUILD_SHARED_LIBS"] = "OFF"
     # ccache
     if args.use_ccache:
         defs["CMAKE_CXX_COMPILER_LAUNCHER"] = "ccache"
     # Frontends
-    fe_list = set()
     if args.frontends:
-        fe_list.update(args.frontends)
-    for fe in FRONTENDS:
-        if getattr(args, f"enable_{fe}", False):
-            fe_list.add(fe)
-    for fe in FRONTENDS:
-        defs[f"ENABLE_OV_{fe.upper()}"] = "ON" if fe in fe_list else "OFF"
+        for fe in args.frontends:
+            defs[f"ENABLE_OV_{fe.upper()}_FRONTEND"] = "ON"
     # Plugins
-    pl_list = set()
     if args.plugins:
-        pl_list.update(args.plugins)
-    for pl in PLUGINS:
-        if getattr(args, f"enable_{pl}", False):
-            pl_list.add(pl)
-    for pl in PLUGINS:
-        defs[f"ENABLE_{pl.upper()}"] = "ON" if pl in pl_list else "OFF"
+        for pl in args.plugins:
+            defs[f"ENABLE_{pl.upper()}"] = "ON"
     # Conditional compilation
     if args.enable_cc == 'collect':
         defs['SELECTIVE_BUILD'] = 'COLLECT'
