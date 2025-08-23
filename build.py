@@ -177,7 +177,16 @@ def _build_parser() -> argparse.ArgumentParser:
                    help="Import parameters from a YAML file (default '.build')")
     p.add_argument("--ignore-config", action="store_true",
                    help="Ignore the default .build configuration file")
+    # Extra arguments
+    p.add_argument("--cmake-extra-defines", nargs="+",
+                   help="Extra CMake definitions (-D<key>=<value>). Provide as <key>=<value>.")
 
+    p.add_argument("--cmake-extra-configure-args", nargs="+",
+                   help="Extra CMake configure arguments (e.g., -G, --debug-output)")
+
+    p.add_argument("--cmake-extra-build-args", nargs="+",
+                   help="Extra CMake build arguments (e.g., --verbose, --config)")
+    # Target list
     p.add_argument("target", nargs=argparse.REMAINDER,
                    help="Targets passed verbatim to 'cmake --build'")
 
@@ -296,7 +305,17 @@ def _collect_cmake_defs(args, root_path: Path) -> dict[str, str]:
 
 
 def _cmake_options(args, root_path: Path) -> List[str]:
-    return [f"-D{k}={v}" for k, v in _collect_cmake_defs(args, root_path).items()]
+    options = [f"-D{k}={v}" for k, v in _collect_cmake_defs(args, root_path).items()]
+
+    # Add extra defines
+    if args.cmake_extra_defines:
+        for define in args.cmake_extra_defines:
+            if '=' in define:
+                options.append(f"-D{define}")
+            else:
+                options.append(f"-D{define}=ON")
+
+    return options
 
 
 def add_arg(cmd: list[str], flag: str, value=None):
@@ -486,6 +505,10 @@ def run() -> None:
         '-B', str(build_dir)
     ]
 
+    # Add extra CMake configure args
+    if args.cmake_extra_configure_args:
+        cmake_cmd.extend(args.cmake_extra_configure_args)
+
     if args.verbose > 2:
         print('CMake command:', ' '.join(cmake_cmd))
         print('Build dir:', build_dir)
@@ -508,6 +531,10 @@ def run() -> None:
 
     if args.target:
         add_arg(build_cmd, '--target', args.target)
+
+    # Add extra CMake build args
+    if args.cmake_extra_build_args:
+        build_cmd.extend(args.cmake_extra_build_args)
 
     if args.verbose == 0:
         add_arg(build_cmd, '--', '--quiet')
